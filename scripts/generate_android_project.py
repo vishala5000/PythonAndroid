@@ -1,62 +1,188 @@
-import re
 import os
+import shutil
 
-SPEC_FILE = "buildozer.spec"
-
-def configure_spec():
-    if not os.path.exists(SPEC_FILE):
-        os.system("buildozer init")
-
-    with open(SPEC_FILE, "r") as f:
-        content = f.read()
-
-    # 1. Parse requirements.txt safely
-    reqs = ["python3", "kivy"]
-    if os.path.exists("requirements.txt"):
-        with open("requirements.txt", "r") as f:
-            for line in f:
-                pkg = line.strip().split('==')[0].split('>=')[0].split('<=')[0]
-                if pkg and pkg.lower() not in ['pandas', 'numpy', 'scipy', 'setuptools', 'wheel', '']:
-                    if pkg not in reqs:
-                        reqs.append(pkg)
-    req_str = ",".join(reqs)
-
-    # 2. Apply Guaranteed Settings (Regex matches commented or uncommented lines)
-    replacements = {
-        r'^\s*#?\s*title\s*=.*': 'title = My Python App',
-        r'^\s*#?\s*package\.name\s*=.*': 'package.name = myapp',
-        r'^\s*#?\s*package\.domain\s*=.*': 'package.domain = com.master.build',
-        r'^\s*#?\s*requirements\s*=.*': f'requirements = {req_str}',
-        r'^\s*#?\s*android\.archs\s*=.*': 'android.archs = arm64-v8a',
-        r'^\s*#?\s*android\.permissions\s*=.*': 'android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE',
-        r'^\s*#?\s*android\.accept_sdk_license\s*=.*': 'android.accept_sdk_license = True',
-        r'^\s*#?\s*p4a\.python_version\s*=.*': 'p4a.python_version = 3.10',
+def create_project():
+    if os.path.exists("android_app"):
+        shutil.rmtree("android_app")
         
-        # CRITICAL: Pin to 33 to avoid the build-tools 37.0.0 license trap
-        r'^\s*#?\s*android\.api\s*=.*': 'android.api = 33',
-        r'^\s*#?\s*android\.build_tools_version\s*=.*': 'android.build_tools_version = 33.0.2',
-        
-        r'^\s*#?\s*orientation\s*=.*': 'orientation = portrait',
+    os.makedirs("android_app/app/src/main/java/com/myapp")
+    os.makedirs("android_app/app/src/main/res/layout")
+    os.makedirs("android_app/app/src/main/python")
+
+    # 1. settings.gradle
+    with open("android_app/settings.gradle", "w") as f:
+        f.write("""
+pluginManagement {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories { google(); mavenCentral() }
+}
+rootProject.name = "MyPythonApp"
+include ':app'
+""")
+
+    # 2. build.gradle (root)
+    with open("android_app/build.gradle", "w") as f:
+        f.write("""
+plugins {
+    id 'com.android.application' version '8.2.0' apply false
+    id 'com.chaquo.python' version '15.0.1' apply false
+}
+""")
+
+    # 3. app/build.gradle (Correct Chaquopy syntax)
+    with open("android_app/app/build.gradle", "w") as f:
+        f.write("""
+plugins {
+    id 'com.android.application'
+    id 'com.chaquo.python'
+}
+
+android {
+    namespace 'com.myapp'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.myapp"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
     }
+    buildTypes { release { minifyEnabled false } }
+}
 
-    for pattern, repl in replacements.items():
-        content = re.sub(pattern, repl, content, flags=re.MULTILINE)
+chaquopy {
+    defaultConfig {
+        pip {
+            install "-r", "requirements.txt"
+        }
+    }
+    sourceSets {
+        main {
+            srcDir "src/main/python"
+        }
+    }
+}
 
-    # 3. Fallback injection if lines were completely missing
-    for key, value in [
-        ('android.api', '33'),
-        ('android.build_tools_version', '33.0.2')
-    ]:
-        if f"{key} = {value}" not in content:
-            if "[app]" in content:
-                content = content.replace("[app]", f"[app]\n{key} = {value}", 1)
-            else:
-                content += f"\n[app]\n{key} = {value}\n"
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}
+""")
 
-    with open(SPEC_FILE, "w") as f:
-        f.write(content)
+    # 4. AndroidManifest.xml
+    with open("android_app/app/src/main/AndroidManifest.xml", "w") as f:
+        f.write("""<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <application android:allowBackup="true" android:label="My Python App" 
+                 android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+""")
+
+    # 5. MainActivity.java
+    with open("android_app/app/src/main/java/com/myapp/MainActivity.java", "w") as f:
+        f.write("""package com.myapp;
+
+import android.os.Bundle;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
+
+public class MainActivity extends AppCompatActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        if (!Python.isStarted()) {
+            Python.start(new AndroidPlatform(this));
+        }
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        
+        TextView output = findViewById(R.id.output_text);
+        Python py = Python.getInstance();
+        py.getModule("main").callAttr("run_app", output);
+    }
+}
+""")
+
+    # 6. activity_main.xml
+    with open("android_app/app/src/main/res/layout/activity_main.xml", "w") as f:
+        f.write("""<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:padding="16dp">
+    <TextView android:id="@+id/output_text" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="Starting Python..."
+        android:textSize="18sp" android:textIsSelectable="true"/>
+</ScrollView>
+""")
+
+    # 7. Auto-Wrap User's main.py
+    if os.path.exists("main.py"):
+        with open("main.py", "r") as f:
+            user_code = f.read()
+        
+        with open("android_app/app/src/main/python/user_logic.py", "w") as f:
+            f.write(user_code)
+            
+        with open("android_app/app/src/main/python/main.py", "w") as f:
+            f.write("""
+import sys
+import threading
+
+def run_app(text_view):
+    class TextViewWriter:
+        def write(self, text):
+            text_view.post(lambda: text_view.append(text))
+        def flush(self): pass
     
-    print(f"✅ Configured buildozer.spec with pinned API 33 and Build Tools 33.0.2")
+    sys.stdout = TextViewWriter()
+    sys.stderr = TextViewWriter()
+    
+    def run_logic():
+        try:
+            import user_logic
+            if hasattr(user_logic, 'main'):
+                user_logic.main()
+        except Exception as e:
+            print(f"Error in user code: {e}")
+            
+    threading.Thread(target=run_logic, daemon=True).start()
+""")
+    else:
+        with open("android_app/app/src/main/python/main.py", "w") as f:
+            f.write("def run_app(tv):\n    tv.post(lambda: tv.setText('Hello from Python!'))\n")
+
+    # 8. Copy requirements.txt to the app module directory (CRITICAL for Chaquopy)
+    if os.path.exists("requirements.txt"):
+        shutil.copy("requirements.txt", "android_app/app/requirements.txt")
+    else:
+        with open("android_app/app/requirements.txt", "w") as f:
+            f.write("# Add your pip dependencies here\n")
+
+    # 9. CRITICAL: Generate gradle.properties with AndroidX enabled
+    with open("android_app/gradle.properties", "w") as f:
+        f.write("""
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+android.nonTransitiveRClass=true
+""")
+
+    # 10. Generate Gradle Wrapper
+    os.system("cd android_app && gradle wrapper --gradle-version 8.2")
+    
+    print("✅ Android project generated successfully! No Buildozer required.")
 
 if __name__ == "__main__":
-    configure_spec()
+    create_project()
