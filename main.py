@@ -1,86 +1,115 @@
-from kivy.app import App
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.core.window import Window
+from android.widget import LinearLayout, TextView, Button
+from android.view import ViewGroup, View, Gravity
+from android.graphics import Color
 
-class CalculatorApp(App):
-    def build(self):
-        Window.clearcolor = (0.12, 0.12, 0.12, 1)
-        self.main_layout = GridLayout(cols=4, padding=15, spacing=10)
+def main(text_view):
+    parent = text_view.getParent()
+    if not isinstance(parent, ViewGroup):
+        return
         
-        self.display = Label(
-            text="0", 
-            font_size="48sp", 
-            halign="right", 
-            valign="middle", 
-            size_hint_y=0.2,
-            color=(1, 1, 1, 1)
-        )
-        self.display.bind(size=self._update_label_size)
-        self.main_layout.add_widget(self.display)
-        
-        buttons = [
-            ['7', '8', '9', '/'],
-            ['4', '5', '6', '*'],
-            ['1', '2', '3', '-'],
-            ['.', '0', '=', '+'],
-            ['C']
-        ]
-        
-        for row in buttons:
-            if len(row) == 1:
-                btn = Button(
-                    text=row[0], 
-                    size_hint_y=0.2, 
-                    font_size="36sp", 
-                    background_color=(0.8, 0.2, 0.2, 1),
-                    color=(1, 1, 1, 1)
-                )
-                btn.bind(on_press=self.clear_display)
-                self.main_layout.add_widget(btn)
+    parent.removeAllViews()
+    context = text_view.getContext()
+    
+    # 1. Main Layout (Dark Theme)
+    main_layout = LinearLayout(context)
+    main_layout.setOrientation(LinearLayout.VERTICAL)
+    main_layout.setBackgroundColor(Color.parseColor("#121212"))
+    main_layout.setPadding(30, 60, 30, 30)
+    
+    # 2. Display Screen
+    display = TextView(context)
+    display.setBackgroundColor(Color.parseColor("#1E1E1E"))
+    display.setTextColor(Color.parseColor("#BB86FC")) # Purple accent
+    display.setTextSize(48.0)
+    display.setPadding(20, 40, 20, 40)
+    display.setText("0")
+    display.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL)
+    
+    main_layout.addView(display, LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        0, 1.0  # Weight 1.0 pushes buttons to the bottom
+    ))
+    
+    # 3. Button Definitions: (text, bg_color, text_color, weight)
+    buttons_rows = [
+        [("C", "#CF6679", "#000000", 1), ("±", "#333333", "#FFFFFF", 1), ("%", "#333333", "#FFFFFF", 1), ("÷", "#BB86FC", "#000000", 1)],
+        [("7", "#333333", "#FFFFFF", 1), ("8", "#333333", "#FFFFFF", 1), ("9", "#333333", "#FFFFFF", 1), ("×", "#BB86FC", "#000000", 1)],
+        [("4", "#333333", "#FFFFFF", 1), ("5", "#333333", "#FFFFFF", 1), ("6", "#333333", "#FFFFFF", 1), ("-", "#BB86FC", "#000000", 1)],
+        [("1", "#333333", "#FFFFFF", 1), ("2", "#333333", "#FFFFFF", 1), ("3", "#333333", "#FFFFFF", 1), ("+", "#BB86FC", "#000000", 1)],
+        [("0", "#333333", "#FFFFFF", 2), (".", "#333333", "#FFFFFF", 1), ("=", "#03DAC6", "#000000", 1)] # 0 spans 2 columns
+    ]
+    
+    current_expression = [""]
+    
+    # 4. Click Handler
+    class ClickListener(View.OnClickListener):
+        def onClick(self, view):
+            text = str(view.getText())
+            if text == "C":
+                current_expression[0] = ""
+                display.setText("0")
+            elif text == "±":
+                if current_expression[0].startswith("-"):
+                    current_expression[0] = current_expression[0][1:]
+                else:
+                    current_expression[0] = "-" + current_expression[0]
+                display.setText(current_expression[0] or "0")
+            elif text == "%":
+                try:
+                    val = eval(current_expression[0]) / 100
+                    current_expression[0] = str(val)
+                    display.setText(current_expression[0])
+                except Exception:
+                    display.setText("Error")
+                    current_expression[0] = ""
+            elif text == "=":
+                try:
+                    if not current_expression[0]:
+                        return
+                    # Safely evaluate math expression
+                    expr = current_expression[0].replace("×", "*").replace("÷", "/")
+                    result = eval(expr)
+                    if isinstance(result, float) and result.is_integer():
+                        result = int(result)
+                    current_expression[0] = str(result)
+                    display.setText(current_expression[0])
+                except Exception:
+                    display.setText("Error")
+                    current_expression[0] = ""
             else:
-                for btn_text in row:
-                    btn = Button(text=btn_text, font_size="36sp", color=(1, 1, 1, 1))
-                    if btn_text == '=':
-                        btn.bind(on_press=self.calculate)
-                        btn.background_color = (0.2, 0.7, 0.3, 1)
-                    elif btn_text in ['+', '-', '*', '/']:
-                        btn.background_color = (0.2, 0.4, 0.8, 1)
-                    else:
-                        btn.bind(on_press=self.on_button_press)
-                    self.main_layout.add_widget(btn)
-                    
-        return self.main_layout
+                current_expression[0] += text
+                display.setText(current_expression[0])
 
-    def _update_label_size(self, instance, value):
-        instance.text_size = instance.size
-
-    def on_button_press(self, instance):
-        current = self.display.text
-        if current == '0' or current == 'Error':
-            self.display.text = instance.text
-        else:
-            self.display.text = current + instance.text
-
-    def calculate(self, instance):
-        try:
-            expression = self.display.text
-            if all(c in '0123456789+-*/. ' for c in expression):
-                result = str(eval(expression))
-                if result.endswith('.0'):
-                    result = result[:-2]
-                self.display.text = result
-            else:
-                self.display.text = 'Error'
-        except Exception:
-            self.display.text = 'Error'
-
-    def clear_display(self, instance):
-        self.display.text = '0'
-
-def main():
-    CalculatorApp().run()
-
-if __name__ == '__main__':
-    main()
+    click_listener = ClickListener()
+    
+    # 5. Generate Button Rows
+    for row in buttons_rows:
+        row_layout = LinearLayout(context)
+        row_layout.setOrientation(LinearLayout.HORIZONTAL)
+        
+        for btn_text, bg_color, txt_color, weight in row:
+            btn = Button(context)
+            btn.setText(btn_text)
+            btn.setTextColor(Color.parseColor(txt_color))
+            btn.setBackgroundColor(Color.parseColor(bg_color))
+            btn.setTextSize(28.0)
+            btn.setGravity(Gravity.CENTER)
+            btn.setOnClickListener(click_listener)
+            
+            # Add margins
+            params = LinearLayout.LayoutParams(0, 180, weight) # height=180px
+            params.setMargins(10, 10, 10, 10)
+            btn.setLayoutParams(params)
+            
+            row_layout.addView(btn)
+            
+        main_layout.addView(row_layout, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+        
+    # 6. Add the new calculator UI to the screen
+    parent.addView(main_layout, ViewGroup.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.MATCH_PARENT
+    ))
