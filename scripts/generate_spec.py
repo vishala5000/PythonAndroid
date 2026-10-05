@@ -26,7 +26,6 @@ def configure_spec():
     req_str = ",".join(reqs)
 
     # 2. Apply "Guaranteed" Settings using robust regex
-    # This matches the line whether it is commented out (#) or not, and replaces it entirely.
     replacements = {
         r'^\s*#?\s*title\s*=.*': 'title = My Python App',
         r'^\s*#?\s*package\.name\s*=.*': 'package.name = myapp',
@@ -37,8 +36,7 @@ def configure_spec():
         r'^\s*#?\s*android\.accept_sdk_license\s*=.*': 'android.accept_sdk_license = True',
         r'^\s*#?\s*p4a\.python_version\s*=.*': 'p4a.python_version = 3.10',
         
-        # CRITICAL FIX: Pin API and Build Tools to stable versions to prevent 
-        # Buildozer from downloading bleeding-edge tools (like 37.0.0) that break CI licenses
+        # CRITICAL: Pin API and Build Tools to stable versions
         r'^\s*#?\s*android\.api\s*=.*': 'android.api = 33',
         r'^\s*#?\s*android\.build_tools_version\s*=.*': 'android.build_tools_version = 33.0.2',
         
@@ -48,14 +46,12 @@ def configure_spec():
     for pattern, repl in replacements.items():
         content = re.sub(pattern, repl, content, flags=re.MULTILINE)
 
-    # 3. Double-check fallback: If for some reason the line didn't exist at all, inject it
-    # This is the ultimate guarantee that the setting is present and uncommented.
+    # 3. Double-check fallback: If the line didn't exist, inject it under [app]
     for key, value in [
         ('android.api', '33'),
         ('android.build_tools_version', '33.0.2')
     ]:
         if f"{key} = {value}" not in content:
-            # Find the [app] section and append there to ensure Buildozer reads it correctly
             if "[app]" in content:
                 content = content.replace("[app]", f"[app]\n{key} = {value}", 1)
             else:
