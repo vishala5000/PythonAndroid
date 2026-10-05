@@ -1,82 +1,49 @@
-name: 🚀 Ultra-Fast Android TTS Builder
+name: Ultra-Fast Android TTS Builder
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: ☕ Set up JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 🤖 Use Native Pre-installed Android SDK
+      - name: Configure Android SDK
         run: |
           echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
           mkdir -p $ANDROID_HOME/licenses
-          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
-          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
-          echo "✅ Android SDK licenses accepted."
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
 
-      # CRITICAL FIX: Generate the project structure FIRST so it isn't deleted
-      - name: 🏗️ Generate Android Project
+      - name: Generate Android Project
         run: python scripts/generate_android_project.py
 
-      - name: 📥 Download & Prepare Piper TTS Models
+      - name: Download and Prepare TTS Models
         run: |
           pip install onnx
-          
-          # Define the assets directory inside the newly generated project
-          ASSETS_DIR="android_app/app/src/main/assets/tts"
-          mkdir -p "$ASSETS_DIR"
-          cd "$ASSETS_DIR"
-          
-          echo "📥 Downloading release assets..."
-          curl -sL -o en_US-ljspeech-medium.onnx https://github.com/vishala5000/PythonAndroid/releases/download/Pipertts/en_US-ljspeech-medium.onnx
-          curl -sL -o en_US-ljspeech-medium.onnx.json https://github.com/vishala5000/PythonAndroid/releases/download/Pipertts/en_US-ljspeech-medium.onnx.json
-          
-          echo "🔧 Injecting Sherpa-ONNX metadata..."
-          python3 -c "
-import json, onnx
-with open('en_US-ljspeech-medium.onnx.json', 'r') as f: config = json.load(f)
-with open('tokens.txt', 'w', encoding='utf-8') as f:
-    for s, i in config['phoneme_id_map'].items(): f.write(f'{s} {i[0]}\n')
-model = onnx.load('en_US-ljspeech-medium.onnx')
-meta = {
-    'model_type': 'vits', 'comment': 'piper', 'language': config['language']['name_english'],
-    'voice': config['espeak']['voice'], 'has_espeak': 1, 'n_speakers': config['num_speakers'],
-    'sample_rate': config['audio']['sample_rate']
-}
-for k, v in meta.items():
-    m = model.metadata_props.add(); m.key = k; m.value = str(v)
-onnx.save(model, 'ljspeech.onnx')
-print('✅ Model metadata injected successfully!')
-"
-          echo "📥 Downloading espeak-ng-data..."
-          curl -sL -o espeak-ng-data.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2
-          tar -xf espeak-ng-data.tar.bz2
-          
-          echo "🧹 Cleaning up raw files to minimize APK size..."
-          rm -f en_US-ljspeech-medium.onnx en_US-ljspeech-medium.onnx.json espeak-ng-data.tar.bz2
-          echo "✅ TTS assets prepared successfully in $ASSETS_DIR"
+          python scripts/prepare_tts.py
 
-      - name: 🚀 Build APK with Gradle
+      - name: Build APK with Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.2'
           arguments: assembleDebug
           build-root-directory: ./android_app
 
-      - name: 🔑 Auto-Sign APK
+      - name: Auto-Sign APK
         run: |
           KEYSTORE="$HOME/.android/debug.keystore"
           UNSIGNED="android_app/app/build/outputs/apk/debug/app-debug.apk"
@@ -84,31 +51,16 @@ print('✅ Model metadata injected successfully!')
           
           mkdir -p "$HOME/.android"
           if [ ! -f "$KEYSTORE" ]; then
-            echo "Generating default public debug keystore..."
-            keytool -genkey -v \
-              -keystore "$KEYSTORE" \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+            keytool -genkey -v -keystore "$KEYSTORE" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
           
-          # Use -type f to ensure we only get the executable file, not a directory
           APKSIGNER=$(find /usr/local/lib/android/sdk/build-tools -type f -name "apksigner" | head -n 1)
           echo "Using apksigner at: $APKSIGNER"
           
-          "$APKSIGNER" sign \
-            --ks "$KEYSTORE" \
-            --ks-pass pass:android \
-            --ks-key-alias androiddebugkey \
-            --key-pass pass:android \
-            --out "$SIGNED" \
-            "$UNSIGNED"
-            
+          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android --out "$SIGNED" "$UNSIGNED"
           echo "✅ APK signed successfully!"
 
-      - name: 📤 Upload Signed APK
+      - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: piper-tts-unlimited-app
