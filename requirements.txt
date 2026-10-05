@@ -1,2 +1,1 @@
-# Add any pure Python packages here. They will be installed via pip automatically.
-requests
+kivy==2.3.0
