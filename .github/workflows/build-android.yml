@@ -66,32 +66,29 @@ jobs:
           if [ ! -f "$BUILDOZER_SPEC" ]; then buildozer init; fi
           python scripts/generate_spec.py
 
-      - name: 🛠️ Pre-install Android SDK Tools (Fix Buildozer Path Bug)
+      - name: 🛠️ Pre-install Android SDK Tools & Accept ALL Licenses
         run: |
           SDK_DIR=$HOME/.buildozer/android/platform/android-sdk
-          mkdir -p $SDK_DIR/tools/bin
+          mkdir -p $SDK_DIR/cmdline-tools/latest/bin
           mkdir -p $SDK_DIR/licenses
           
           # Clean up any partial/broken downloads from previous failed runs
           rm -rf $SDK_DIR/cmdline-tools
           rm -rf $SDK_DIR/tools
           
-          # Download a stable command-line tools version (6858069)
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-6858069_latest.zip -O /tmp/cmdline.zip
+          # Download stable command line tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline.zip
           unzip -q /tmp/cmdline.zip -d /tmp/cmdline
+          mv /tmp/cmdline/cmdline-tools/* $SDK_DIR/cmdline-tools/latest/
           
-          # Move binaries to the EXACT legacy path Buildozer expects
-          mv /tmp/cmdline/cmdline-tools/bin/sdkmanager $SDK_DIR/tools/bin/
-          mv /tmp/cmdline/cmdline-tools/bin/apksigner $SDK_DIR/tools/bin/
-          mv /tmp/cmdline/cmdline-tools/bin/avdmanager $SDK_DIR/tools/bin/
+          # THE SILVER BULLET: Accept ALL licenses automatically (bypasses the y/N prompt completely)
+          # This writes the license hashes for ALL versions (including 37.0.0) to the licenses folder
+          yes | $SDK_DIR/cmdline-tools/latest/bin/sdkmanager --sdk_root=$SDK_DIR --licenses || true
           
-          # Pre-accept all Android SDK licenses to prevent interactive prompts
-          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $SDK_DIR/licenses/android-sdk-license
-          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $SDK_DIR/licenses/android-sdk-preview-license
-          echo -e "\nd56f5187479451eabf01fb78af6dfcb131a6481e" >> $SDK_DIR/licenses/android-sdk-license
-          echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55" >> $SDK_DIR/licenses/android-sdk-license
+          # Pre-install required components to speed up build and ensure stability
+          $SDK_DIR/cmdline-tools/latest/bin/sdkmanager --sdk_root=$SDK_DIR "platform-tools" "build-tools;33.0.2" "platforms;android-33"
           
-          echo "✅ Android SDK tools pre-installed and licenses accepted."
+          echo "✅ Android SDK tools pre-installed and ALL licenses accepted."
 
       - name: 🏗️ Build APK
         run: |
