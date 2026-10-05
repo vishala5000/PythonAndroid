@@ -1,1 +1,84 @@
+name: 🚀 Master Android Builder (Guaranteed)
 
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+env:
+  BUILDOZER_SPEC: buildozer.spec
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.10 (Stable for Android)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: ☕ Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📦 Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git python3 python3-pip \
+            zip unzip openjdk-17-jdk autoconf libtool \
+            zlib1g-dev libncurses5-dev libffi-dev libssl-dev
+
+      - name: 🚀 Install Buildozer & Cython (Pinned Versions for Stability)
+        run: |
+          pip install --upgrade pip
+          # Cython 0.29.33 is the "Golden Version" for Buildozer stability
+          pip install buildozer cython==0.29.33 virtualenv
+
+      - name: 🗄️ Cache Android SDK & Gradle (Speed Optimization)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle
+            ~/.android
+            .buildozer
+          key: ${{ runner.os }}-android-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-android-
+
+      - name: 🛡️ PRE-FLIGHT CHECK (The Guarantee)
+        run: |
+          python scripts/pre_flight.py
+        # If this fails, it means you used tkinter/PyQt. 
+        # It stops here to save you 30 minutes of failed building.
+
+      - name: 🪄 AUTO-WRAPPER (If no UI detected)
+        run: |
+          python scripts/auto_wrapper.py
+
+      - name: ⚙️ Generate buildozer.spec
+        run: |
+          if [ ! -f "$BUILDOZER_SPEC" ]; then buildozer init; fi
+          python scripts/generate_spec.py
+
+      - name: 🏗️ Build APK
+        run: |
+          # We use 'sudo' for the build step to ensure permission fixes for SDK
+          sudo chown -R runner:runner ~/.buildozer
+          buildozer android debug
+        env:
+          BUILDOZER_ACCEPT_SDK_LICENSE: "1"
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-android-app
+          path: bin/*.apk
