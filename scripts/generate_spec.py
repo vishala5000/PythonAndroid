@@ -34,6 +34,12 @@ def configure_spec():
         r'^android.permissions\s*=.*': f'android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE',
         r'^android.accept_sdk_license\s*=.*': f'android.accept_sdk_license = True',
         r'^p4a.python_version\s*=.*': f'p4a.python_version = 3.10', # Match CI
+        
+        # CRITICAL FIX: Pin API and Build Tools to stable versions to prevent 
+        # Buildozer from downloading bleeding-edge tools that break CI licenses
+        r'^android.api\s*=.*': f'android.api = 33',
+        r'^android.build_tools_version\s*=.*': f'android.build_tools_version = 33.0.2',
+        
         r'^orientation\s*=.*': f'orientation = portrait',
     }
 
