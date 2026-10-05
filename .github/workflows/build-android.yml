@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: ☕ Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -27,7 +27,7 @@ jobs:
           mkdir -p $ANDROID_HOME/licenses
           echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
           echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
-          echo "✅ Native Android SDK configured."
+          echo "✅ Native Android SDK configured and licenses accepted."
 
       - name: 🏗️ Generate Android Project & Wrap Python
         run: python scripts/generate_android_project.py
@@ -39,34 +39,44 @@ jobs:
           arguments: assembleDebug
           build-root-directory: ./android_app
 
-      - name: 🔑 Auto-Sign APK (No Secrets Required)
+      - name: 🔑 Auto-Sign APK using apksigner (No Secrets)
         run: |
-          # 1. Ensure the default debug keystore exists
-          mkdir -p ~/.android
-          if [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkey -v -keystore ~/.android/debug.keystore \
-              -storepass android -alias androiddebugkey \
-              -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+          # 1. Define paths
+          KEYSTORE="$HOME/.android/debug.keystore"
+          UNSIGNED="android_app/app/build/outputs/apk/debug/app-debug.apk"
+          SIGNED="android_app/app/build/outputs/apk/debug/app-signed.apk"
+          
+          # 2. Generate the standard public debug keystore if it doesn't exist
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$KEYSTORE" ]; then
+            echo "Generating default public debug keystore..."
+            keytool -genkey -v \
+              -keystore "$KEYSTORE" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
           
-          # 2. Find the apksigner tool dynamically
+          # 3. Locate apksigner from the native GitHub Android SDK
           APKSIGNER=$(find /usr/local/lib/android/sdk/build-tools -name "apksigner" | head -n 1)
+          echo "Using apksigner at: $APKSIGNER"
           
-          # 3. Sign the APK using the default public debug credentials
-          $APKSIGNER sign \
-            --ks ~/.android/debug.keystore \
+          # 4. Sign the APK using the default public credentials (No secrets required)
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
             --ks-pass pass:android \
             --ks-key-alias androiddebugkey \
             --key-pass pass:android \
-            --out android_app/app/build/outputs/apk/debug/app-signed.apk \
-            android_app/app/build/outputs/apk/debug/app-debug.apk
+            --out "$SIGNED" \
+            "$UNSIGNED"
             
-          echo "✅ APK successfully signed with the default debug key!"
+          echo "✅ APK signed successfully using default debug credentials!"
 
       - name: 📤 Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: my-python-android-app
+          name: my-signed-android-app
           path: android_app/app/build/outputs/apk/debug/app-signed.apk
           if-no-files-found: error
