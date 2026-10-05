@@ -32,7 +32,7 @@ plugins {
 }
 """)
 
-    # 3. app/build.gradle (Configures Chaquopy)
+    # 3. app/build.gradle (Corrected Chaquopy syntax)
     with open("android_app/app/build.gradle", "w") as f:
         f.write("""
 plugins {
@@ -50,13 +50,24 @@ android {
         versionCode 1
         versionName "1.0"
     }
-    buildTypes { release { minifyEnabled false } }
-    sourceSets { main { python.srcDir "src/main/python" } }
+    buildTypes { 
+        release { 
+            minifyEnabled false 
+        } 
+    }
 }
 
-python {
-    pip {
-        install "-r", "requirements.txt"
+// CORRECTED: The block must be named 'chaquopy', not 'python'
+chaquopy {
+    defaultConfig {
+        pip {
+            install "-r", "requirements.txt"
+        }
+    }
+    sourceSets {
+        main {
+            srcDir "src/main/python"
+        }
     }
 }
 
@@ -165,7 +176,7 @@ def run_app(text_view):
     # 9. Generate Gradle Wrapper
     os.system("cd android_app && gradle wrapper --gradle-version 8.2")
     
-    print("✅ Android project generated successfully!")
+    print("✅ Android project generated successfully with correct Chaquopy syntax!")
 
 if __name__ == "__main__":
     create_project()
