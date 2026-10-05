@@ -32,7 +32,7 @@ plugins {
 }
 """)
 
-    # 3. app/build.gradle (Corrected Chaquopy syntax)
+    # 3. app/build.gradle (Added required ndk.abiFilters)
     with open("android_app/app/build.gradle", "w") as f:
         f.write("""
 plugins {
@@ -49,6 +49,11 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
+        
+        // REQUIRED BY CHAQUOPY: Specify target architectures
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
     }
     buildTypes { 
         release { 
@@ -57,7 +62,6 @@ android {
     }
 }
 
-// CORRECTED: The block must be named 'chaquopy', not 'python'
 chaquopy {
     defaultConfig {
         pip {
@@ -176,7 +180,7 @@ def run_app(text_view):
     # 9. Generate Gradle Wrapper
     os.system("cd android_app && gradle wrapper --gradle-version 8.2")
     
-    print("✅ Android project generated successfully with correct Chaquopy syntax!")
+    print("✅ Android project generated successfully with ndk.abiFilters!")
 
 if __name__ == "__main__":
     create_project()
