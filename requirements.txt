@@ -1,1 +1,2 @@
-kivy==2.3.0
+# No external pip dependencies required!
+# This calculator uses only built-in Python and Chaquopy's Android SDK bindings.
