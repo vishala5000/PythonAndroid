@@ -1,4 +1,4 @@
-name: 🚀 Ultra-Fast Android Builder (No Buildozer)
+name: 🚀 Ultra-Fast Android TTS Builder
 
 on:
   push:
@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -23,60 +22,64 @@ jobs:
         run: |
           echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          
           mkdir -p $ANDROID_HOME/licenses
           echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
           echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
-          echo "✅ Native Android SDK configured and licenses accepted."
 
-      - name: 🏗️ Generate Android Project & Wrap Python
+      - name: 📥 Download & Prepare Piper TTS Models
+        run: |
+          pip install onnx
+          mkdir -p android_app/app/src/main/assets/tts
+          cd android_app/app/src/main/assets/tts
+          
+          curl -sL -o en_US-ljspeech-medium.onnx https://github.com/vishala5000/PythonAndroid/releases/download/Pipertts/en_US-ljspeech-medium.onnx
+          curl -sL -o en_US-ljspeech-medium.onnx.json https://github.com/vishala5000/PythonAndroid/releases/download/Pipertts/en_US-ljspeech-medium.onnx.json
+          
+          python3 -c "
+import json, onnx
+with open('en_US-ljspeech-medium.onnx.json', 'r') as f: config = json.load(f)
+with open('tokens.txt', 'w', encoding='utf-8') as f:
+    for s, i in config['phoneme_id_map'].items(): f.write(f'{s} {i[0]}\n')
+model = onnx.load('en_US-ljspeech-medium.onnx')
+meta = {
+    'model_type': 'vits', 'comment': 'piper', 'language': config['language']['name_english'],
+    'voice': config['espeak']['voice'], 'has_espeak': 1, 'n_speakers': config['num_speakers'],
+    'sample_rate': config['audio']['sample_rate']
+}
+for k, v in meta.items():
+    m = model.metadata_props.add(); m.key = k; m.value = str(v)
+onnx.save(model, 'ljspeech.onnx')
+print('✅ Model metadata injected successfully!')
+"
+          curl -sL -o espeak-ng-data.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2
+          tar -xf espeak-ng-data.tar.bz2
+          rm en_US-ljspeech-medium.onnx en_US-ljspeech-medium.onnx.json espeak-ng-data.tar.bz2
+
+      - name: 🏗️ Generate Android Project
         run: python scripts/generate_android_project.py
 
-      - name: 🚀 Build APK with Gradle (Ultra Fast)
+      - name: 🚀 Build APK with Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.2'
           arguments: assembleDebug
           build-root-directory: ./android_app
 
-      - name: 🔑 Auto-Sign APK using apksigner (No Secrets)
+      - name: 🔑 Auto-Sign APK
         run: |
-          # 1. Define paths
           KEYSTORE="$HOME/.android/debug.keystore"
           UNSIGNED="android_app/app/build/outputs/apk/debug/app-debug.apk"
           SIGNED="android_app/app/build/outputs/apk/debug/app-signed.apk"
-          
-          # 2. Generate the standard public debug keystore if it doesn't exist
           mkdir -p "$HOME/.android"
           if [ ! -f "$KEYSTORE" ]; then
-            echo "Generating default public debug keystore..."
-            keytool -genkey -v \
-              -keystore "$KEYSTORE" \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+            keytool -genkey -v -keystore "$KEYSTORE" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
-          
-          # 3. Locate apksigner from the native GitHub Android SDK
           APKSIGNER=$(find /usr/local/lib/android/sdk/build-tools -name "apksigner" | head -n 1)
-          echo "Using apksigner at: $APKSIGNER"
-          
-          # 4. Sign the APK using the default public credentials (No secrets required)
-          "$APKSIGNER" sign \
-            --ks "$KEYSTORE" \
-            --ks-pass pass:android \
-            --ks-key-alias androiddebugkey \
-            --key-pass pass:android \
-            --out "$SIGNED" \
-            "$UNSIGNED"
-            
-          echo "✅ APK signed successfully using default debug credentials!"
+          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android --out "$SIGNED" "$UNSIGNED"
 
       - name: 📤 Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: my-signed-android-app
+          name: piper-tts-unlimited-app
           path: android_app/app/build/outputs/apk/debug/app-signed.apk
           if-no-files-found: error
