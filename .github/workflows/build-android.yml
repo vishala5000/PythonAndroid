@@ -14,19 +14,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: ☕ Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5  # <-- Updated to v5 to clear the deprecation warning
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: 🤖 Use Native Pre-installed Android SDK
         run: |
-          # GitHub's ubuntu-latest runner already has a complete Android SDK pre-installed.
-          # We just need to point environment variables to it and ensure licenses are accepted.
           echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
           
-          # Pre-accept licenses to prevent any interactive prompts
           mkdir -p $ANDROID_HOME/licenses
           echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
           echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
