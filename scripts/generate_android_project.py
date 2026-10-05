@@ -169,17 +169,25 @@ def run_app(text_view):
         with open("android_app/app/src/main/python/main.py", "w") as f:
             f.write("def run_app(tv):\n    tv.post(lambda: tv.setText('Hello from Python!'))\n")
 
-    # 8. Copy requirements.txt to the app module directory (where build.gradle is)
+    # 8. Copy requirements.txt to the app module directory
     if os.path.exists("requirements.txt"):
         shutil.copy("requirements.txt", "android_app/app/requirements.txt")
     else:
         with open("android_app/app/requirements.txt", "w") as f:
             f.write("# Add your pip dependencies here\n")
 
-    # 9. Generate Gradle Wrapper
+    # 9. CRITICAL FIX: Generate gradle.properties with AndroidX enabled
+    with open("android_app/gradle.properties", "w") as f:
+        f.write("""
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+android.nonTransitiveRClass=true
+""")
+
+    # 10. Generate Gradle Wrapper
     os.system("cd android_app && gradle wrapper --gradle-version 8.2")
     
-    print("✅ Android project generated successfully!")
+    print("✅ Android project generated successfully with AndroidX enabled!")
 
 if __name__ == "__main__":
     create_project()
