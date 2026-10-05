@@ -20,7 +20,6 @@ def configure_spec():
                     reqs.append(pkg)
     
     # Remove known problematic packages for a "Guaranteed" build
-    # (Users can add them back manually if they have specific recipes)
     reqs = [r for r in reqs if r not in ['pandas', 'numpy', 'scipy']] 
 
     req_str = ",".join(reqs)
