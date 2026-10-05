@@ -1,188 +1,78 @@
-import os
-import shutil
+name: 🚀 Ultra-Fast Android Builder (No Buildozer)
 
-def create_project():
-    if os.path.exists("android_app"):
-        shutil.rmtree("android_app")
-        
-    os.makedirs("android_app/app/src/main/java/com/myapp")
-    os.makedirs("android_app/app/src/main/res/layout")
-    os.makedirs("android_app/app/src/main/python")
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
-    # 1. settings.gradle
-    with open("android_app/settings.gradle", "w") as f:
-        f.write("""
-pluginManagement {
-    repositories { google(); mavenCentral(); gradlePluginPortal() }
-}
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral() }
-}
-rootProject.name = "MyPythonApp"
-include ':app'
-""")
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-    # 2. build.gradle (root)
-    with open("android_app/build.gradle", "w") as f:
-        f.write("""
-plugins {
-    id 'com.android.application' version '8.2.0' apply false
-    id 'com.chaquo.python' version '15.0.1' apply false
-}
-""")
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
 
-    # 3. app/build.gradle (Correct Chaquopy syntax)
-    with open("android_app/app/build.gradle", "w") as f:
-        f.write("""
-plugins {
-    id 'com.android.application'
-    id 'com.chaquo.python'
-}
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-android {
-    namespace 'com.myapp'
-    compileSdk 34
-    defaultConfig {
-        applicationId "com.myapp"
-        minSdk 21
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-        ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-        }
-    }
-    buildTypes { release { minifyEnabled false } }
-}
+      - name: 🤖 Use Native Pre-installed Android SDK
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          
+          mkdir -p $ANDROID_HOME/licenses
+          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
+          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
+          echo "✅ Native Android SDK configured and licenses accepted."
 
-chaquopy {
-    defaultConfig {
-        pip {
-            install "-r", "requirements.txt"
-        }
-    }
-    sourceSets {
-        main {
-            srcDir "src/main/python"
-        }
-    }
-}
+      - name: 🏗️ Generate Android Project & Wrap Python
+        run: python scripts/generate_android_project.py
 
-dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-}
-""")
+      - name: 🚀 Build APK with Gradle (Ultra Fast)
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
+          arguments: assembleDebug
+          build-root-directory: ./android_app
 
-    # 4. AndroidManifest.xml
-    with open("android_app/app/src/main/AndroidManifest.xml", "w") as f:
-        f.write("""<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <application android:allowBackup="true" android:label="My Python App" 
-                 android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
-        <activity android:name=".MainActivity" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>
-""")
-
-    # 5. MainActivity.java
-    with open("android_app/app/src/main/java/com/myapp/MainActivity.java", "w") as f:
-        f.write("""package com.myapp;
-
-import android.os.Bundle;
-import android.widget.TextView;
-import androidx.appcompat.app.AppCompatActivity;
-import com.chaquo.python.Python;
-import com.chaquo.python.android.AndroidPlatform;
-
-public class MainActivity extends AppCompatActivity {
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        if (!Python.isStarted()) {
-            Python.start(new AndroidPlatform(this));
-        }
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        
-        TextView output = findViewById(R.id.output_text);
-        Python py = Python.getInstance();
-        py.getModule("main").callAttr("run_app", output);
-    }
-}
-""")
-
-    # 6. activity_main.xml
-    with open("android_app/app/src/main/res/layout/activity_main.xml", "w") as f:
-        f.write("""<?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent" android:padding="16dp">
-    <TextView android:id="@+id/output_text" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:text="Starting Python..."
-        android:textSize="18sp" android:textIsSelectable="true"/>
-</ScrollView>
-""")
-
-    # 7. Auto-Wrap User's main.py
-    if os.path.exists("main.py"):
-        with open("main.py", "r") as f:
-            user_code = f.read()
-        
-        with open("android_app/app/src/main/python/user_logic.py", "w") as f:
-            f.write(user_code)
+      - name: 🔑 Auto-Sign APK using apksigner (No Secrets)
+        run: |
+          KEYSTORE="$HOME/.android/debug.keystore"
+          UNSIGNED="android_app/app/build/outputs/apk/debug/app-debug.apk"
+          SIGNED="android_app/app/build/outputs/apk/debug/app-signed.apk"
+          
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$KEYSTORE" ]; then
+            echo "Generating default public debug keystore..."
+            keytool -genkey -v \
+              -keystore "$KEYSTORE" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          
+          APKSIGNER=$(find /usr/local/lib/android/sdk/build-tools -name "apksigner" | head -n 1)
+          echo "Using apksigner at: $APKSIGNER"
+          
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-pass pass:android \
+            --ks-key-alias androiddebugkey \
+            --key-pass pass:android \
+            --out "$SIGNED" \
+            "$UNSIGNED"
             
-        with open("android_app/app/src/main/python/main.py", "w") as f:
-            f.write("""
-import sys
-import threading
+          echo "✅ APK signed successfully using default debug credentials!"
 
-def run_app(text_view):
-    class TextViewWriter:
-        def write(self, text):
-            text_view.post(lambda: text_view.append(text))
-        def flush(self): pass
-    
-    sys.stdout = TextViewWriter()
-    sys.stderr = TextViewWriter()
-    
-    def run_logic():
-        try:
-            import user_logic
-            if hasattr(user_logic, 'main'):
-                user_logic.main()
-        except Exception as e:
-            print(f"Error in user code: {e}")
-            
-    threading.Thread(target=run_logic, daemon=True).start()
-""")
-    else:
-        with open("android_app/app/src/main/python/main.py", "w") as f:
-            f.write("def run_app(tv):\n    tv.post(lambda: tv.setText('Hello from Python!'))\n")
-
-    # 8. Copy requirements.txt to the app module directory (CRITICAL for Chaquopy)
-    if os.path.exists("requirements.txt"):
-        shutil.copy("requirements.txt", "android_app/app/requirements.txt")
-    else:
-        with open("android_app/app/requirements.txt", "w") as f:
-            f.write("# Add your pip dependencies here\n")
-
-    # 9. CRITICAL: Generate gradle.properties with AndroidX enabled
-    with open("android_app/gradle.properties", "w") as f:
-        f.write("""
-org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-android.useAndroidX=true
-android.nonTransitiveRClass=true
-""")
-
-    # 10. Generate Gradle Wrapper
-    os.system("cd android_app && gradle wrapper --gradle-version 8.2")
-    
-    print("✅ Android project generated successfully! No Buildozer required.")
-
-if __name__ == "__main__":
-    create_project()
+      - name: 📤 Upload Signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-signed-android-app
+          path: android_app/app/build/outputs/apk/debug/app-signed.apk
+          if-no-files-found: error
