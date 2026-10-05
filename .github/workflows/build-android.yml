@@ -63,7 +63,6 @@ jobs:
 
       - name: ⚙️ Generate buildozer.spec
         run: |
-          if [ ! -f "$BUILDOZER_SPEC" ]; then buildozer init; fi
           python scripts/generate_spec.py
 
       - name: 🏗️ Build APK (The Ultimate Fix)
