@@ -1,6 +1,3 @@
-# This is your original Python code. 
-# The GitHub Action will automatically wrap it to display on Android.
-
 def main():
     print("🚀 Welcome to the Ultra-Fast Android Builder!")
     print("No Buildozer, no heavy NDK compilation.")
@@ -8,7 +5,6 @@ def main():
     
     result = 15 * 25
     print(f"✅ Result: {result}")
-    
     print("\nYour app is fully working on Android!")
 
 if __name__ == "__main__":
