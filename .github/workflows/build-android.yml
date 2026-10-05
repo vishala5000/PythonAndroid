@@ -19,11 +19,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 🤖 Setup Android SDK (Native & Fast)
-        uses: android-actions/setup-android@v3
-
-      - name: 🛠️ Install Gradle (For Project Scaffolding)
-        run: sudo apt-get install -y gradle
+      - name: 🤖 Use Native Pre-installed Android SDK
+        run: |
+          # GitHub's ubuntu-latest runner already has a complete Android SDK pre-installed.
+          # We just need to point environment variables to it and ensure licenses are accepted.
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          
+          # Pre-accept licenses to prevent any interactive prompts
+          mkdir -p $ANDROID_HOME/licenses
+          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
+          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
+          echo "✅ Native Android SDK configured and licenses accepted."
 
       - name: 🏗️ Generate Android Project & Wrap Python
         run: python scripts/generate_android_project.py
@@ -40,3 +47,4 @@ jobs:
         with:
           name: ultra-fast-android-app
           path: android_app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
