@@ -66,6 +66,17 @@ jobs:
           if [ ! -f "$BUILDOZER_SPEC" ]; then buildozer init; fi
           python scripts/generate_spec.py
 
+      - name: 🛡️ Pre-Accept Android SDK Licenses (Bypass Prompt)
+        run: |
+          # Create the licenses directory where Buildozer installs the SDK
+          mkdir -p $HOME/.buildozer/android/platform/android-sdk/licenses
+          
+          # Write the known license hashes to bypass the interactive 'Accept? (y/N)' prompt
+          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
+          echo -e "\nd56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+
       - name: 🏗️ Build APK
         run: |
           mkdir -p ~/.buildozer
