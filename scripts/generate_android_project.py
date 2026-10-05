@@ -32,7 +32,7 @@ plugins {
 }
 """)
 
-    # 3. app/build.gradle (Added required ndk.abiFilters)
+    # 3. app/build.gradle
     with open("android_app/app/build.gradle", "w") as f:
         f.write("""
 plugins {
@@ -50,7 +50,6 @@ android {
         versionCode 1
         versionName "1.0"
         
-        // REQUIRED BY CHAQUOPY: Specify target architectures
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
         }
@@ -97,7 +96,7 @@ dependencies {
 </manifest>
 """)
 
-    # 5. MainActivity.java (Launches Python)
+    # 5. MainActivity.java
     with open("android_app/app/src/main/java/com/myapp/MainActivity.java", "w") as f:
         f.write("""package com.myapp;
 
@@ -123,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
 }
 """)
 
-    # 6. activity_main.xml (UI Layout)
+    # 6. activity_main.xml
     with open("android_app/app/src/main/res/layout/activity_main.xml", "w") as f:
         f.write("""<?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
@@ -170,17 +169,17 @@ def run_app(text_view):
         with open("android_app/app/src/main/python/main.py", "w") as f:
             f.write("def run_app(tv):\n    tv.post(lambda: tv.setText('Hello from Python!'))\n")
 
-    # 8. Copy requirements.txt
+    # 8. Copy requirements.txt to the app module directory (where build.gradle is)
     if os.path.exists("requirements.txt"):
-        shutil.copy("requirements.txt", "android_app/app/src/main/python/requirements.txt")
+        shutil.copy("requirements.txt", "android_app/app/requirements.txt")
     else:
-        with open("android_app/app/src/main/python/requirements.txt", "w") as f:
+        with open("android_app/app/requirements.txt", "w") as f:
             f.write("# Add your pip dependencies here\n")
 
     # 9. Generate Gradle Wrapper
     os.system("cd android_app && gradle wrapper --gradle-version 8.2")
     
-    print("✅ Android project generated successfully with ndk.abiFilters!")
+    print("✅ Android project generated successfully!")
 
 if __name__ == "__main__":
     create_project()
