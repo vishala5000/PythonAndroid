@@ -167,7 +167,7 @@ def run_app(text_view):
         with open("android_app/app/src/main/python/requirements.txt", "w") as f:
             f.write("# Add your pip dependencies here\n")
 
-    # 9. Generate Gradle Wrapper (Required for GitHub Actions)
+    # 9. Generate Gradle Wrapper (ubuntu-latest has gradle pre-installed)
     os.system("cd android_app && gradle wrapper --gradle-version 8.2")
     
     print("✅ Android project generated successfully! No Buildozer required.")
