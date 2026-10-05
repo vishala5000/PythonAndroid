@@ -1,4 +1,4 @@
-#PROMPT 1
+# PROMPT 1
 
 Act as an Expert Python-to-Android Developer and CI/CD Specialist. Your goal is to generate a complete, 100% working, ultra-fast GitHub Actions repository that converts Python code into an Android APK using Chaquopy (NO Buildozer). 
 
